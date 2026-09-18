@@ -26,3 +26,11 @@ Copy-Item .env.example .env  # then set MERGE_API_KEY locally
 - Runtime choice: `gpt-5.6-luna`, effort `high`
 - Strict structured output works. Every object in `response_format` must set `additionalProperties: false`; `uniqueItems` is rejected and must be enforced locally.
 - Never commit `.env` or print the API key.
+
+## Current code map
+
+- `app/schemas.py`: strict request validation.
+- `app/solver.py`: 24-hour SciPy/HiGHS cost optimizer with all five actionable directive constraints.
+- `app/checker.py`: independent replay of schedule invariants and totals.
+- `app/main.py`: health endpoint and controlled optimization stub; Run 3 must wire the live LLM pipeline.
+- `tests/`: smallest runnable checks for the API boundary and SAMPLE-01 solver path.
