@@ -54,7 +54,7 @@ if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -D
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The 24 offline tests do not require a provider key or make model calls. They replay all 10 public cases using organizer-expected directives, not an LLM interpretation.
+The offline test suite does not require a provider key or make model calls. It replays all 10 public cases using organizer-expected directives, not an LLM interpretation.
 
 In another PowerShell window:
 
@@ -150,7 +150,7 @@ Equivalent optimal schedules and explanation wording may differ; directive seman
 - `app/main.py`: health endpoint and full interpretation -> guardrails -> solver -> checker pipeline.
 - `tests/`: API/guardrail checks and all 10 organizer-ground-truth solver replays, with repository-local samples.
 - `.dockerignore`: excludes local environment secrets, Git metadata, virtualenv, and caches from future image builds; image contents and container behavior must be verified in Run 8, not before.
-- `Dockerfile`: minimal Python 3.11 container startup with `0.0.0.0` binding and shell-expanded `${PORT:-8000}`; not built or run yet.
+- `Dockerfile`: minimal Python 3.11 container startup with `0.0.0.0` binding and shell-expanded `${PORT:-8000}`; Railway has built and runs it remotely, but no separate pullable fallback image is available.
 
 ## Dependencies and credits
 
@@ -166,6 +166,17 @@ Equivalent optimal schedules and explanation wording may differ; directive seman
 
 Exact pinned versions are in `requirements.txt`.
 
+## Docker fallback command (image unavailable)
+
+No exact pullable image tag or digest is currently available. Do not treat the placeholder below as a published image. If one is separately authorized, published, and verified, replace it with that exact reference:
+
+```powershell
+$image = "<exact-pullable-image-tag-or-digest-not-yet-available>"
+docker pull $image
+docker run --rm --env-file .env -e PORT=8000 -p 8000:8000 $image
+curl.exe --fail-with-body http://127.0.0.1:8000/health
+```
+
 ## Evidence and limitations
 
 - [RUN4_RESULTS.md](RUN4_RESULTS.md) contains prior live-local all-10 evidence; it is not a deployed SLA or proof of current provider availability.
@@ -177,6 +188,6 @@ Exact pinned versions are in `requirements.txt`.
 
 ## Docker, Railway, and video boundaries
 
-Do not use Docker on this device. During Run 8, Docker is only for Railway's remote build/deployment path via the authenticated Railway Codex integration. The prepared Dockerfile remains unverified until Railway builds and runs it; registry publication still needs separate authorization.
+Do not use Docker on this device. Railway remotely built and runs the Dockerfile, but that deployment is not a separately pullable fallback image. Local Docker execution remains unverified, and registry publication still needs separate authorization.
 
 This README supplies the later <=3-minute video with the factual architecture, demo commands, SAMPLE-01 semantics, evidence, and limitations. Run 7 may create the script/storyboard, capture local visuals/API output, synthesize authorized ElevenLabs narration, and assemble/verify captions, audio, and video with FFmpeg. Keep `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` only in an ignored local environment; never print, embed, record, or commit them. Run 6 does not record, synthesize, assemble, publish, upload, or submit video.
