@@ -2,6 +2,10 @@
 
 Minimal Python 3.11 implementation for the BUP CSE Fest 2026 online preliminary.
 
+- Live API: `https://gridwise-production-1034.up.railway.app`
+- Public source: `https://github.com/I-am-Mr-Rookie/gridwise-bup-2026`
+- Run 8 deployed evidence: [RUN8_LIVE_RESULTS.md](RUN8_LIVE_RESULTS.md) - 14/14 pass, warm p95 4,141 ms. A separate fresh-chat stress evaluation is intentionally not part of Run 8.
+
 ## Read first
 
 - Current progress and exact next step: [STATUS.md](STATUS.md)
@@ -169,7 +173,7 @@ Exact pinned versions are in `requirements.txt`.
 - Public examples do not prove hidden-case performance. Local guardrails reject malformed or invented model output.
 - Provider outage, invalid credentials, exhausted quota, or the 20-second total provider deadline produces a safe 500. Solver work runs off the API event loop so health remains responsive.
 - The continuous one-hour model assumes no battery efficiency loss, following the supplied challenge.
-- No deployment, Railway build, pullable image, or container-runtime evidence exists yet.
+- Railway successfully built the Dockerfile remotely and the public API passed the external suite. A separately pullable registry image with an exact tag/digest is still unavailable.
 
 ## Docker, Railway, and video boundaries
 
