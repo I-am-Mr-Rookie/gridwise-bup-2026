@@ -12,9 +12,33 @@ def check_plan(
 ) -> list[str]:
     errors: list[str] = []
     source = {item.hour: item for item in request.hours}
+    if not isinstance(response, dict):
+        return ["response must be an object"]
     plan = response.get("hourly_plan", [])
-    if len(plan) != 24 or {item.get("hour") for item in plan} != set(range(24)):
+    if (
+        not isinstance(plan, list)
+        or len(plan) != 24
+        or any(not isinstance(item, dict) or type(item.get("hour")) is not int for item in plan)
+        or {item["hour"] for item in plan} != set(range(24))
+    ):
         return ["hourly_plan must contain exactly one entry for every hour 0 through 23"]
+
+    def finite_number(value: Any) -> bool:
+        try:
+            return type(value) in {int, float} and math.isfinite(value)
+        except OverflowError:
+            return False
+
+    # Validate before replay/aggregation so malformed output cannot crash the checker.
+    for item in plan:
+        for name in ("grid_kwh", "solar_used_kwh", "battery_kwh", "battery_energy_after_kwh"):
+            value = item.get(name)
+            if not finite_number(value) or value < -tolerance:
+                errors.append(f"hour {item['hour']}: {name} must be finite and non-negative")
+        if not isinstance(item.get("battery_action"), str) or item["battery_action"] not in {"charge", "discharge", "idle"}:
+            errors.append(f"hour {item['hour']}: invalid battery_action")
+    if errors:
+        return errors
 
     solar_cap = {hour: source[hour].solar_kwh for hour in range(24)}
     reserve = {hour: request.battery.minimum_energy_kwh for hour in range(24)}
@@ -48,14 +72,8 @@ def check_plan(
     for item in ordered:
         hour = item["hour"]
         values = [item.get(name) for name in ("grid_kwh", "solar_used_kwh", "battery_kwh", "battery_energy_after_kwh")]
-        if any(not isinstance(value, (int, float)) or not math.isfinite(value) or value < -tolerance for value in values):
-            errors.append(f"hour {hour}: numeric values must be finite and non-negative")
-            continue
         grid, solar, amount, energy = values
         action = item.get("battery_action")
-        if action not in {"charge", "discharge", "idle"}:
-            errors.append(f"hour {hour}: invalid battery_action")
-            continue
         charge = amount if action == "charge" else 0
         discharge = amount if action == "discharge" else 0
         if action == "idle" and abs(amount) > tolerance:
@@ -86,7 +104,7 @@ def check_plan(
     calculated_cost = sum(item["grid_kwh"] * source[item["hour"]].tariff_bdt_per_kwh for item in ordered)
     calculated_peak = max(item["grid_kwh"] for item in ordered)
     for name, calculated in (("total_grid_kwh", calculated_grid), ("total_cost_bdt", calculated_cost), ("peak_grid_kwh", calculated_peak)):
-        if not isinstance(response.get(name), (int, float)) or abs(response[name] - calculated) > tolerance:
+        if not finite_number(response.get(name)) or not math.isfinite(calculated) or abs(response[name] - calculated) > tolerance:
             errors.append(f"{name} does not match hourly_plan")
     return errors
 
@@ -95,4 +113,3 @@ def assert_valid_plan(request: OptimizeRequest, directives: list[dict[str, Any]]
     errors = check_plan(request, directives, response)
     if errors:
         raise AssertionError("; ".join(errors))
-

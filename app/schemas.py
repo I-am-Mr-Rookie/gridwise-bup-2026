@@ -3,8 +3,8 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
-NonNegative = Annotated[float, Field(ge=0, allow_inf_nan=False)]
-NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+NonNegative = Annotated[float, Field(ge=0, allow_inf_nan=False, strict=True)]
+NonEmptyText = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 
 
 class StrictModel(BaseModel):
@@ -12,7 +12,7 @@ class StrictModel(BaseModel):
 
 
 class Hour(StrictModel):
-    hour: int = Field(ge=0, le=23)
+    hour: int = Field(ge=0, le=23, strict=True)
     demand_kwh: NonNegative
     solar_kwh: NonNegative
     tariff_bdt_per_kwh: NonNegative
@@ -45,4 +45,3 @@ class OptimizeRequest(StrictModel):
         if {entry.hour for entry in self.hours} != set(range(24)):
             raise ValueError("hours must contain each integer from 0 through 23 exactly once")
         return self
-

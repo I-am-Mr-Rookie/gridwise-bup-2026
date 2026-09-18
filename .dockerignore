@@ -1,0 +1,11 @@
+.env
+.env.*
+.git
+.railway
+.venv
+**/__pycache__
+.pytest_cache
+*.py[cod]
+tests
+*.md
+*.log
