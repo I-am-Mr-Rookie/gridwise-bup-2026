@@ -149,8 +149,8 @@ Equivalent optimal schedules and explanation wording may differ; directive seman
 - `app/directives.py`: deterministic LLM-output guardrails and normalization.
 - `app/main.py`: health endpoint and full interpretation -> guardrails -> solver -> checker pipeline.
 - `tests/`: API/guardrail checks and all 10 organizer-ground-truth solver replays, with repository-local samples.
-- `.dockerignore`: excludes local environment secrets, Git metadata, virtualenv, and caches from future image builds; image contents and container behavior must be verified in Run 8, not before.
-- `Dockerfile`: minimal Python 3.11 container startup with `0.0.0.0` binding and shell-expanded `${PORT:-8000}`; Railway has built and runs it remotely, but no separate pullable fallback image is available.
+- `.dockerignore`: excludes local environment secrets, Git metadata, virtualenv, caches, tests, and evidence from image builds.
+- `Dockerfile`: minimal Python 3.11 container startup with `0.0.0.0` binding and shell-expanded `${PORT:-8000}`; the digest-pinned fallback image below passed an independent Railway pull/start check.
 
 ## Dependencies and credits
 
@@ -166,12 +166,12 @@ Equivalent optimal schedules and explanation wording may differ; directive seman
 
 Exact pinned versions are in `requirements.txt`.
 
-## Docker fallback command (image unavailable)
+## Docker fallback command
 
-No exact pullable image tag or digest is currently available. Do not treat the placeholder below as a published image. If one is separately authorized, published, and verified, replace it with that exact reference:
+The public image is pinned by digest so the command cannot silently pull a different build:
 
 ```powershell
-$image = "<exact-pullable-image-tag-or-digest-not-yet-available>"
+$image = "ghcr.io/i-am-mr-rookie/gridwise-bup-2026@sha256:9e4334347d97af868f2d9100ca56cb88a3d903bd4f3b765865e9e0372bb98f89"
 docker pull $image
 docker run --rm --env-file .env -e PORT=8000 -p 8000:8000 $image
 curl.exe --fail-with-body http://127.0.0.1:8000/health
@@ -181,13 +181,14 @@ curl.exe --fail-with-body http://127.0.0.1:8000/health
 
 - [RUN4_RESULTS.md](RUN4_RESULTS.md) contains prior live-local all-10 evidence; it is not a deployed SLA or proof of current provider availability.
 - [RUN5_PACKAGING.md](RUN5_PACKAGING.md) contains draft Railway/container commands; they are unverified.
+- [POST_STRESS_RESULTS.md](POST_STRESS_RESULTS.md) records the isolated real-provider replay and exact fallback-image publication/pull/start evidence.
 - Public examples do not prove hidden-case performance. Local guardrails reject malformed or invented model output.
 - Provider outage, invalid credentials, exhausted quota, or the 20-second total provider deadline produces a safe 500. Solver work runs off the API event loop so health remains responsive.
 - The continuous one-hour model assumes no battery efficiency loss, following the supplied challenge.
-- Railway successfully built the Dockerfile remotely and the public API passed the external suite. A separately pullable registry image with an exact tag/digest is still unavailable.
+- Railway successfully built the Dockerfile remotely and the public API passed the external suite. The public digest-pinned GHCR fallback was independently pulled and started by a separate Railway service.
 
 ## Docker, Railway, and video boundaries
 
-Do not use Docker on this device. Railway remotely built and runs the Dockerfile, but that deployment is not a separately pullable fallback image. Local Docker execution remains unverified, and registry publication still needs separate authorization.
+Do not use Docker on this device. Local Docker execution remains unverified; the published image was instead verified through an anonymous registry fetch and an independent Railway pull/start/end-to-end request.
 
 This README supplies the later <=3-minute video with the factual architecture, demo commands, SAMPLE-01 semantics, evidence, and limitations. Run 7 may create the script/storyboard, capture local visuals/API output, synthesize authorized ElevenLabs narration, and assemble/verify captions, audio, and video with FFmpeg. Keep `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` only in an ignored local environment; never print, embed, record, or commit them. Run 6 does not record, synthesize, assemble, publish, upload, or submit video.
