@@ -5,7 +5,7 @@ import os
 import httpx
 from dotenv import load_dotenv
 
-from app.directives import InvalidDirectiveError, validate_directives
+from app.directives import validate_directives
 from app.schemas import OptimizeRequest
 
 
@@ -107,5 +107,6 @@ async def interpret_directives(request: OptimizeRequest) -> list[dict]:
                 response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
         return validate_directives(json.loads(content), request)
-    except (TimeoutError, httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError, InvalidDirectiveError) as exc:
+    # ValueError covers JSONDecodeError, UnicodeDecodeError, and InvalidDirectiveError.
+    except (TimeoutError, httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
         raise LLMError("LLM directive interpretation failed safely.") from exc

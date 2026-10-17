@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 
 NonNegative = Annotated[float, Field(ge=0, allow_inf_nan=False, strict=True)]
-NonEmptyText = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
+NonEmptyText = Annotated[str, StringConstraints(min_length=1, max_length=2000, pattern=r"\S")]
 
 
 class StrictModel(BaseModel):

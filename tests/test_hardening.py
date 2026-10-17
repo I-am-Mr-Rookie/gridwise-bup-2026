@@ -213,3 +213,31 @@ def test_concurrent_offline_requests(monkeypatch):
                 assert check_plan(request, directives, response.json()) == []
             assert (await client.get("/health")).json() == {"status": "ok"}
     asyncio.run(run())
+
+
+def test_oversized_text_is_400():
+    request, _ = sample()
+    body = request.model_dump()
+    body["operator_notes"] = ["x" * 2001]
+    with TestClient(main.app, raise_server_exceptions=False) as client:
+        assert client.post("/optimize-energy", json=body).status_code == 400
+
+
+def test_optimizer_failure_other_than_infeasible_is_500(monkeypatch):
+    request, directives = sample()
+    class Result:
+        status, success = 1, False  # e.g. HiGHS iteration/time limit
+    monkeypatch.setattr("app.solver.milp", lambda *args, **kwargs: Result())
+    with pytest.raises(RuntimeError) as error:
+        solve(request, directives)
+    assert not isinstance(error.value, InfeasibleScheduleError)
+
+
+def test_undecodable_provider_body_fails_safely(monkeypatch):
+    request, _ = sample()
+    async def post(*_, **__):
+        return httpx.Response(200, content=b"\xff\xfe\xfa", request=httpx.Request("POST", "http://offline"))
+    monkeypatch.setenv("MERGE_API_KEY", "offline-test-key")
+    monkeypatch.setattr(llm.httpx.AsyncClient, "post", post)
+    with pytest.raises(llm.LLMError):
+        asyncio.run(llm.interpret_directives(request))

@@ -10,17 +10,17 @@ Minimal Python 3.11 implementation for the BUP CSE Fest 2026 online preliminary.
 
 - Current progress and exact next step: [STATUS.md](STATUS.md)
 - Runtime model preference and verification: [MODEL_PREFERENCE.md](MODEL_PREFERENCE.md)
-- No commits, pushes, or deployment **before Run 8**. Local Docker on this device is intentionally out of scope and must not be run or troubleshot. In Run 8, use Docker only in Railway through the authenticated Railway Codex integration. Preserve current uncommitted work; registry publication, visibility changes, and contest submission remain separately gated.
+- Run 8 (Railway deployment and commits/pushes) is complete; see [STATUS.md](STATUS.md). Local Docker on this device is intentionally out of scope and must not be run or troubleshot. In Run 8, use Docker only in Railway through the authenticated Railway Codex integration. Preserve current uncommitted work; registry publication, visibility changes, and contest submission remain separately gated.
 - Build runbook: [../GPT-5.6-Sol-GridWise-Runbook.html](../GPT-5.6-Sol-GridWise-Runbook.html)
 - Canonical problem statement: [../BUP_CSE_FEST_2026_Participant_Docs/BUP_CSE_FEST_2026_Preliminary_Problem_Statement_GridWise_LLM.pdf](../BUP_CSE_FEST_2026_Participant_Docs/BUP_CSE_FEST_2026_Preliminary_Problem_Statement_GridWise_LLM.pdf)
 - Repository-local public cases: [tests/data/BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json](tests/data/BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json), an unchanged organizer-provided copy. SHA-256: `FA6ABD71868E0FAF429A87429D7D4A2B7BFD38C5551565637498D7FEC68D5F32`.
-- Parent-directory links above are workspace planning references, not runtime/test dependencies. Run commands below from this `gridwise` directory.
+- Parent-directory links above are workspace planning references, not runtime/test dependencies. Run commands below from this repository root.
 
 ## API and architecture
 
 - `GET /health` returns `{"status":"ok"}`.
-- `POST /optimize-energy` accepts a scenario ID, 1-3 operator notes, all 24 hourly demand/solar/tariff rows, and battery limits.
-- Malformed input returns 400, infeasible constraints 422, and provider/interpretation or unexpected failures a redacted 500, matching the problem's response-code contract.
+- `POST /optimize-energy` accepts a scenario ID, 1-3 operator notes (each at most 2,000 characters), all 24 hourly demand/solar/tariff rows, and battery limits.
+- Malformed input returns 400, infeasible constraints 422 (only when HiGHS proves infeasibility; other optimizer failures are 500), and provider/interpretation or unexpected failures a redacted 500, matching the problem's response-code contract.
 
 ```text
 request -> Pydantic validation -> one structured-output LLM call
@@ -150,7 +150,7 @@ Equivalent optimal schedules and explanation wording may differ; directive seman
 - `app/main.py`: health endpoint and full interpretation -> guardrails -> solver -> checker pipeline.
 - `tests/`: API/guardrail checks and all 10 organizer-ground-truth solver replays, with repository-local samples.
 - `.dockerignore`: excludes local environment secrets, Git metadata, virtualenv, caches, tests, and evidence from image builds.
-- `Dockerfile`: minimal Python 3.11 container startup with `0.0.0.0` binding and shell-expanded `${PORT:-8000}`; the digest-pinned fallback image below passed an independent Railway pull/start check.
+- `Dockerfile`: minimal Python 3.11 container startup with `0.0.0.0` binding and shell-expanded `${PORT:-8000}`, running as the unprivileged `nobody` user; the digest-pinned fallback image below predates the `nobody` change and passed an independent Railway pull/start check.
 
 ## Dependencies and credits
 

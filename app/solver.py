@@ -82,8 +82,11 @@ def solve(request: OptimizeRequest, directives: list[dict[str, Any]]) -> dict[st
         constraints=LinearConstraint(matrix, target, target),
         options={"presolve": True},
     )
-    if not result.success:
+    if result.status == 2:
         raise InfeasibleScheduleError("No feasible schedule exists.")
+    if not result.success:
+        # Limits/numerical failures are server faults, not proof of infeasibility (422).
+        raise RuntimeError(f"Optimizer failed with status {result.status}.")
 
     values = result.x
 
