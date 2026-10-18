@@ -34,6 +34,14 @@ def test_health() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_console_page_is_served() -> None:
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert 'id="payload"' in response.text
+
+
 def test_invalid_requests_are_400() -> None:
     assert client.post("/optimize-energy", content="{").status_code == 400
     request = valid_request()

@@ -1,6 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.checker import assert_valid_plan
@@ -17,6 +19,11 @@ async def invalid_request(_: Request, exc: RequestValidationError) -> JSONRespon
     # Do not echo input/context: either may contain non-finite numbers or secrets.
     errors = [{key: error[key] for key in ("loc", "msg", "type")} for error in exc.errors()]
     return JSONResponse(status_code=400, content={"detail": errors})
+
+
+@app.get("/", include_in_schema=False)
+async def console() -> FileResponse:
+    return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
 @app.get("/health")

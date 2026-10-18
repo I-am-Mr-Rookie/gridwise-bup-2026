@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GridWise · Energy schedule console</title>
+<style>
+  :root {
+    --bg: #111317; --panel: #1a1d23; --line: #2c313a; --text: #e8e6e3; --muted: #a3a7ae;
+    --accent: #ff8a3d; --charge: #6fd3a4; --error: #ff7b7b;
+    --mono: "Source Code Pro", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); }
+  header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: baseline; justify-content: space-between;
+    padding: 1rem clamp(1rem, 4vw, 2.5rem); border-bottom: 1px solid var(--line); font-family: var(--mono); }
+  header h1 { margin: 0; font-size: 1.15rem; letter-spacing: .04em; }
+  header p { margin: 0; color: var(--muted); font-size: .85rem; }
+  #health::before { content: "●"; margin-right: .4em; }
+  #health.ok { color: var(--charge); }
+  #health.down { color: var(--error); }
+  main { display: grid; gap: 1.5rem; padding: 1.5rem clamp(1rem, 4vw, 2.5rem); max-width: 1400px; margin: 0 auto; }
+  @media (min-width: 1000px) { main { grid-template-columns: minmax(340px, 5fr) 7fr; align-items: start; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1.25rem; min-width: 0; }
+  h2 { margin: 0 0 .75rem; font: 600 .8rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  label { display: block; font-weight: 600; margin-bottom: .4rem; }
+  .hint { color: var(--muted); font-size: .85rem; margin: 0 0 .75rem; }
+  textarea { width: 100%; min-height: 24rem; resize: vertical; padding: .75rem; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; font: .82rem/1.45 var(--mono); }
+  .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .9rem; align-items: center; }
+  button, .file { font: 600 .9rem var(--mono); padding: .55rem 1rem; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--line); background: transparent; color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #1a1208; box-shadow: 3px 3px 0 #000; }
+  button.primary:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+  button:disabled { opacity: .6; cursor: progress; }
+  .file input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .file:focus-within, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #status:empty { display: none; }
+  #status { margin: 1rem 0 0; padding: .75rem; border-left: 3px solid var(--error); background: #2a1c1e; white-space: pre-wrap;
+    font: .85rem/1.45 var(--mono); }
+  #status.info { border-color: var(--accent); background: #2a2219; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin: 0 0 1rem; }
+  .metrics div { border: 1px solid var(--line); border-radius: 4px; padding: .75rem; }
+  .metrics dt { color: var(--muted); font-size: .8rem; }
+  .metrics dd { margin: .2rem 0 0; font: 600 1.5rem var(--mono); font-variant-numeric: tabular-nums; }
+  .metrics dd small { font-size: .8rem; color: var(--muted); font-weight: 400; }
+  .empty { color: var(--muted); }
+  ol.directives { list-style: none; padding: 0; margin: 0 0 1.25rem; display: grid; gap: .6rem; }
+  ol.directives li { border: 1px solid var(--line); border-radius: 4px; padding: .7rem .8rem; }
+  .tag { display: inline-block; font: 600 .75rem var(--mono); padding: .1rem .45rem; border-radius: 3px; margin-right: .4rem;
+    background: #3a2a1c; color: var(--accent); }
+  .tag.noop { background: #262a31; color: var(--muted); }
+  ol.directives code { display: block; margin-top: .35rem; font: .8rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font: .85rem var(--mono); font-variant-numeric: tabular-nums; }
+  caption { text-align: left; color: var(--muted); font: .8rem var(--sans); padding-bottom: .5rem; }
+  th, td { padding: .35rem .6rem; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+  th:first-child, td:first-child, td.act { text-align: left; }
+  td.bar { width: 30%; min-width: 90px; }
+  td.bar span { display: block; height: .55rem; background: var(--accent); border-radius: 2px; opacity: .8; }
+  .charge { color: var(--charge); } .discharge { color: var(--accent); } .idle { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>GridWise</h1>
+  <p>24-hour campus energy schedule optimizer</p>
+  <p id="health" role="status">checking API…</p>
+</header>
+<main>
+  <section aria-labelledby="req-h">
+    <h2 id="req-h">Request</h2>
+    <form id="form">
+      <label for="payload">POST /optimize-energy body (JSON)</label>
+      <p class="hint" id="payload-hint">1–3 operator notes, all 24 hourly rows, and battery limits. Prefilled with public SAMPLE-01.</p>
+      <textarea id="payload" spellcheck="false" aria-describedby="payload-hint"></textarea>
+      <div class="actions">
+        <button type="submit" class="primary" id="run">Optimize</button>
+        <label class="file">Load JSON file<input type="file" id="file" accept="application/json,.json"></label>
+        <button type="button" id="reset">Reset to sample</button>
+      </div>
+      <p id="status" role="alert"></p>
+    </form>
+  </section>
+  <section aria-labelledby="res-h" aria-live="polite" id="results">
+    <h2 id="res-h">Result</h2>
+    <p class="empty">Run the optimizer to see the interpreted directives and hourly plan.</p>
+  </section>
+</main>
+<script id="sample" type="application/json">
+{"scenario_id":"SAMPLE-01","operator_notes":["Facilities will wash the rooftop solar panels from noon until 2 PM. During cleaning, usable solar should be treated as roughly 25% of the forecast.","The sports office moved next month's registration deadline."],"hours":[{"hour":0,"demand_kwh":90,"solar_kwh":0,"tariff_bdt_per_kwh":6},{"hour":1,"demand_kwh":85,"solar_kwh":0,"tariff_bdt_per_kwh":6},{"hour":2,"demand_kwh":80,"solar_kwh":0,"tariff_bdt_per_kwh":5},{"hour":3,"demand_kwh":80,"solar_kwh":0,"tariff_bdt_per_kwh":5},{"hour":4,"demand_kwh":85,"solar_kwh":0,"tariff_bdt_per_kwh":5},{"hour":5,"demand_kwh":95,"solar_kwh":0,"tariff_bdt_per_kwh":6},{"hour":6,"demand_kwh":110,"solar_kwh":5,"tariff_bdt_per_kwh":8},{"hour":7,"demand_kwh":130,"solar_kwh":20,"tariff_bdt_per_kwh":10},{"hour":8,"demand_kwh":150,"solar_kwh":50,"tariff_bdt_per_kwh":12},{"hour":9,"demand_kwh":165,"solar_kwh":90,"tariff_bdt_per_kwh":14},{"hour":10,"demand_kwh":175,"solar_kwh":130,"tariff_bdt_per_kwh":16},{"hour":11,"demand_kwh":180,"solar_kwh":160,"tariff_bdt_per_kwh":16},{"hour":12,"demand_kwh":185,"solar_kwh":180,"tariff_bdt_per_kwh":15},{"hour":13,"demand_kwh":180,"solar_kwh":170,"tariff_bdt_per_kwh":14},{"hour":14,"demand_kwh":170,"solar_kwh":140,"tariff_bdt_per_kwh":13},{"hour":15,"demand_kwh":165,"solar_kwh":90,"tariff_bdt_per_kwh":14},{"hour":16,"demand_kwh":170,"solar_kwh":45,"tariff_bdt_per_kwh":18},{"hour":17,"demand_kwh":185,"solar_kwh":10,"tariff_bdt_per_kwh":22},{"hour":18,"demand_kwh":205,"solar_kwh":0,"tariff_bdt_per_kwh":28},{"hour":19,"demand_kwh":215,"solar_kwh":0,"tariff_bdt_per_kwh":30},{"hour":20,"demand_kwh":205,"solar_kwh":0,"tariff_bdt_per_kwh":26},{"hour":21,"demand_kwh":175,"solar_kwh":0,"tariff_bdt_per_kwh":18},{"hour":22,"demand_kwh":135,"solar_kwh":0,"tariff_bdt_per_kwh":10},{"hour":23,"demand_kwh":105,"solar_kwh":0,"tariff_bdt_per_kwh":7}],"battery":{"capacity_kwh":220,"initial_energy_kwh":110,"minimum_energy_kwh":40,"max_charge_kwh_per_hour":50,"max_discharge_kwh_per_hour":50}}
+</script>
+<script>
+const $ = (id) => document.getElementById(id);
+const sample = JSON.stringify(JSON.parse($("sample").textContent), null, 2);
+const fmt = (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+// Builds DOM with textContent only: notes and explanations come from users and the LLM.
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+function setStatus(text, kind = "error") {
+  $("status").className = kind;
+  $("status").textContent = text;
+}
+
+function renderResult(data) {
+  const plan = data.hourly_plan || [];
+  const maxGrid = Math.max(1, ...plan.map((r) => r.grid_kwh));
+  const metric = (label, value, unit) => el("div", {}, el("dt", { textContent: label }),
+    el("dd", {}, fmt(value), " ", el("small", { textContent: unit })));
+
+  const directives = el("ol", { className: "directives" }, ...(data.directive_interpretation || []).map((d) =>
+    el("li", {},
+      el("span", { className: d.applies ? "tag" : "tag noop", textContent: d.directive_type }),
+      `Note ${d.note_index + 1}: ${d.explanation || ""}`,
+      d.structured_adjustment ? el("code", { textContent: JSON.stringify(d.structured_adjustment) }) : "")));
+
+  const head = el("tr", {}, ...["Hour", "Grid kWh", "", "Solar used", "Battery", "kWh", "Stored after"]
+    .map((t) => el("th", t ? { scope: "col", textContent: t } : { ariaHidden: "true" })));
+  const rows = plan.map((r) => el("tr", {},
+    el("th", { scope: "row", textContent: String(r.hour).padStart(2, "0") + ":00" }),
+    el("td", { textContent: fmt(r.grid_kwh) }),
+    el("td", { className: "bar", ariaHidden: "true" }, el("span", { style: `width:${(r.grid_kwh / maxGrid) * 100}%` })),
+    el("td", { textContent: fmt(r.solar_used_kwh) }),
+    el("td", { className: `act ${r.battery_action}`, textContent: r.battery_action }),
+    el("td", { textContent: fmt(r.battery_kwh) }),
+    el("td", { textContent: fmt(r.battery_energy_after_kwh) })));
+
+  $("results").replaceChildren(
+    el("h2", { id: "res-h", textContent: `Result · ${data.scenario_id}` }),
+    el("dl", { className: "metrics" },
+      metric("Total grid energy", data.total_grid_kwh, "kWh"),
+      metric("Total cost", data.total_cost_bdt, "BDT"),
+      metric("Peak grid import", data.peak_grid_kwh, "kWh")),
+    el("p", { textContent: data.plan_summary || "" }),
+    el("h2", { textContent: "Directive interpretation" }),
+    directives,
+    el("h2", { textContent: "Hourly plan" }),
+    el("div", { className: "table-wrap", tabIndex: 0, role: "region", ariaLabel: "Hourly plan table" },
+      el("table", {}, el("caption", { textContent: "Grid import, solar use and battery action per hour" }),
+        el("thead", {}, head), el("tbody", {}, ...rows))));
+}
+
+function describeError(status, body) {
+  const detail = body && body.detail;
+  if (Array.isArray(detail)) {
+    return `Invalid request (${status}):\n` + detail.map((e) => `• ${(e.loc || []).join(".")}: ${e.msg}`).join("\n");
+  }
+  const label = { 422: "No feasible schedule", 500: "Server error" }[status] || `Error ${status}`;
+  return `${label}: ${typeof detail === "string" ? detail : "request failed"}`;
+}
+
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  let payload;
+  try {
+    payload = JSON.parse($("payload").value);
+  } catch (err) {
+    setStatus(`Request body is not valid JSON: ${err.message}`);
+    $("payload").focus();
+    return;
+  }
+  $("run").disabled = true;
+  $("run").textContent = "Optimizing…";
+  $("results").setAttribute("aria-busy", "true");
+  setStatus("Interpreting notes and solving — this calls the LLM and can take several seconds.", "info");
+  try {
+    const res = await fetch("optimize-energy", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(describeError(res.status, body));
+    setStatus("");
+    renderResult(body);
+  } catch (err) {
+    setStatus(err.message);
+  } finally {
+    $("run").disabled = false;
+    $("run").textContent = "Optimize";
+    $("results").removeAttribute("aria-busy");
+  }
+});
+
+$("file").addEventListener("change", async () => {
+  const file = $("file").files[0];
+  if (file) $("payload").value = await file.text();
+  $("file").value = "";
+});
+$("reset").addEventListener("click", () => { $("payload").value = sample; setStatus(""); });
+$("payload").value = sample;
+
+fetch("health").then((r) => r.ok ? r.json() : Promise.reject())
+  .then(() => { $("health").className = "ok"; $("health").textContent = "API online"; })
+  .catch(() => { $("health").className = "down"; $("health").textContent = "API unreachable"; });
+</script>
+</body>
+</html>
