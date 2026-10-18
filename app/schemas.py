@@ -3,7 +3,8 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
-NonNegative = Annotated[float, Field(ge=0, allow_inf_nan=False, strict=True)]
+# Upper bound keeps values far below HiGHS's 1e20 "infinity", which caused false infeasibility.
+NonNegative = Annotated[float, Field(ge=0, le=1e12, allow_inf_nan=False, strict=True)]
 NonEmptyText = Annotated[str, StringConstraints(min_length=1, max_length=2000, pattern=r"\S")]
 
 

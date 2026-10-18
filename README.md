@@ -19,7 +19,7 @@ Minimal Python 3.11 implementation for the BUP CSE Fest 2026 online preliminary.
 ## API and architecture
 
 - `GET /health` returns `{"status":"ok"}`.
-- `POST /optimize-energy` accepts a scenario ID, 1-3 operator notes (each at most 2,000 characters), all 24 hourly demand/solar/tariff rows, and battery limits.
+- `POST /optimize-energy` accepts a scenario ID, 1-3 operator notes (each at most 2,000 characters), all 24 hourly demand/solar/tariff rows, and battery limits. Every numeric value must be finite and between 0 and 10^12; larger magnitudes approach HiGHS's 1e20 infinity and are rejected with 400.
 - Malformed input returns 400, infeasible constraints 422 (only when HiGHS proves infeasibility; other optimizer failures are 500), and provider/interpretation or unexpected failures a redacted 500, matching the problem's response-code contract.
 
 ```text
@@ -78,10 +78,10 @@ curl.exe --fail-with-body `
 For a managed live-local run over every organizer case:
 
 ```powershell
-.\.venv\Scripts\python.exe tests\run_http_samples.py --start-server
+.\.venv\Scripts\python.exe tests\run_http_samples.py --start-server --output live-local-results.md
 ```
 
-The runner owns Uvicorn startup, readiness, and shutdown. It requires a valid provider key and makes quota-dependent calls.
+The runner owns Uvicorn startup, readiness, and shutdown. Always pass `--output`: the default target is `RUN4_RESULTS.md`, so omitting it overwrites the recorded Run 4 evidence. It requires a valid provider key and makes quota-dependent calls.
 
 ## Example request and response
 

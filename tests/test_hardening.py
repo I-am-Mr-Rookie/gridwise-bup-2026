@@ -241,3 +241,78 @@ def test_undecodable_provider_body_fails_safely(monkeypatch):
     monkeypatch.setattr(llm.httpx.AsyncClient, "post", post)
     with pytest.raises(llm.LLMError):
         asyncio.run(llm.interpret_directives(request))
+
+
+@pytest.mark.parametrize("path", [("hours", 0, "demand_kwh"), ("hours", 0, "tariff_bdt_per_kwh"), ("battery", "capacity_kwh")])
+def test_out_of_range_magnitude_is_400_not_false_infeasible(monkeypatch, path):
+    # HiGHS treats |values| >= 1e20 as infinite, so such input used to yield a false 422/500.
+    request, directives = sample()
+    async def fake(_):
+        return directives
+    monkeypatch.setattr(main, "interpret_directives", fake)
+    body = request.model_dump()
+    target = body
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = 1e20
+    with TestClient(main.app, raise_server_exceptions=False) as client:
+        assert client.post("/optimize-energy", json=body).status_code == 400
+
+
+def test_infeasible_directive_is_422_over_http(monkeypatch):
+    request, _ = sample()
+    # Reserve above the initial energy at the last hour cannot return to the initial level.
+    directives = [{"note_index": 0, "applies": True, "directive_type": "minimum_battery_reserve",
+                   "structured_adjustment": {"hours": [23], "minimum_energy_kwh": request.battery.capacity_kwh},
+                   "explanation": "Synthetic."}]
+    async def fake(_):
+        return directives
+    monkeypatch.setattr(main, "interpret_directives", fake)
+    with TestClient(main.app, raise_server_exceptions=False) as client:
+        response = client.post("/optimize-energy", json=request.model_dump())
+    assert response.status_code == 422
+    assert response.json() == {"detail": "No feasible schedule exists."}
+
+
+def test_missing_provider_key_fails_without_network(monkeypatch):
+    request, _ = sample()
+    monkeypatch.delenv("MERGE_API_KEY", raising=False)
+    async def post(*_, **__):
+        raise AssertionError("network must not be used")
+    monkeypatch.setattr(llm.httpx.AsyncClient, "post", post)
+    with pytest.raises(llm.LLMError):
+        asyncio.run(llm.interpret_directives(request))
+
+
+def test_provider_success_is_parsed_and_guardrailed(monkeypatch):
+    request, directives = sample()
+    sent = {}
+    nulls = {"factor": None, "minimum_energy_kwh": None, "max_grid_kwh": None}
+    provider = [{**item, "structured_adjustment": item["structured_adjustment"] and {**nulls, **item["structured_adjustment"]}}
+                for item in directives]
+    async def post(_, url, **kwargs):
+        sent.update(url=url, **kwargs)
+        body = {"choices": [{"message": {"content": json.dumps({"interpretations": provider})}}]}
+        return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+    monkeypatch.setenv("MERGE_API_KEY", "offline-test-key")
+    monkeypatch.setenv("MERGE_BASE_URL", "http://offline/v1/")
+    monkeypatch.setattr(llm.httpx.AsyncClient, "post", post)
+    result = asyncio.run(llm.interpret_directives(request))
+    assert [item["directive_type"] for item in result] == ["solar_reduction", "no_op"]
+    assert result[0]["structured_adjustment"] == {"hours": [12, 13], "factor": 0.25}
+    assert sent["url"] == "http://offline/v1/chat/completions"
+    assert sent["headers"] == {"Authorization": "Bearer offline-test-key"}
+    assert sent["json"]["response_format"] == llm.RESPONSE_FORMAT
+    assert OptimizeRequest.model_validate_json(sent["json"]["messages"][1]["content"]) == request
+
+
+def test_unexpected_failure_is_logged_but_redacted(monkeypatch, caplog):
+    request, _ = sample()
+    async def fake(_):
+        raise ValueError("PRIVATE_INTERNAL_SENTINEL")
+    monkeypatch.setattr(main, "interpret_directives", fake)
+    with TestClient(main.app, raise_server_exceptions=False) as client:
+        response = client.post("/optimize-energy", json=request.model_dump())
+    assert response.json() == {"detail": "Optimization failed safely."}
+    assert "PRIVATE_INTERNAL_SENTINEL" not in response.text
+    assert any(record.exc_info and "PRIVATE_INTERNAL_SENTINEL" in str(record.exc_info[1]) for record in caplog.records)

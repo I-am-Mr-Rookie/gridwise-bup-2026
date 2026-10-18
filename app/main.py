@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -12,6 +13,7 @@ from app.solver import InfeasibleScheduleError, solve
 
 
 app = FastAPI(title="GridWise")
+logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(RequestValidationError)
@@ -40,8 +42,11 @@ async def optimize_energy(request: OptimizeRequest) -> dict:
         assert_valid_plan(request, directives, response)
         return response
     except LLMError as exc:
+        # The client gets a redacted detail; keep the cause in server logs for diagnosis.
+        logger.exception("LLM directive interpretation failed")
         raise HTTPException(status_code=500, detail="LLM directive interpretation failed safely.") from exc
     except InfeasibleScheduleError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("Optimization failed")
         raise HTTPException(status_code=500, detail="Optimization failed safely.") from exc
